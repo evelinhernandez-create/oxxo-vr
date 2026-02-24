@@ -5,41 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>OXXO VR</title>
 
+    <!-- Fuerza fullscreen y evita overlays raros -->
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #111; }
+      a-scene { width: 100vw; height: 100vh; }
+      #hud { position: fixed; top: 10px; left: 10px; z-index: 9999;
+             background: #000a; color: #fff; padding: 10px;
+             font-family: monospace; border-radius: 8px;
+             pointer-events: none; }
+    </style>
+
     <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
-
     <!-- Teleport controls -->
     <script src="https://cdn.jsdelivr.net/gh/fernandojsg/aframe-teleport-controls@master/dist/aframe-teleport-controls.min.js"></script>
   </head>
 
   <body>
-    <!-- HUD -->
-    <div id="hud" style="position:fixed;top:10px;left:10px;z-index:9999;background:#000a;color:#fff;padding:10px;font-family:monospace;border-radius:8px;">
-      Cargando modelo…
-    </div>
+    <div id="hud">Cargando…</div>
 
-    <a-scene background="color: #111" renderer="colorManagement: true" vr-mode-ui="enabled: true">
-      <!-- Guía visual mínima: una caja en el origen -->
-      <a-box position="0 0.5 0" wireframe="true" width="1" height="1" depth="1"></a-box>
+    <a-scene vr-mode-ui="enabled: true" renderer="colorManagement: true">
+      <!-- Cielo oscuro (asegura que el fondo sea del canvas, no del body) -->
+      <a-sky color="#111"></a-sky>
+
+      <!-- Prueba visual SIEMPRE visible (para confirmar que el canvas se ve) -->
+      <a-box id="debugBox" position="0 1 -3" color="#ff0000"></a-box>
+      <a-plane position="0 0 -3" rotation="-90 0 0" width="10" height="10" color="#555"></a-plane>
 
       <a-assets>
-        <!-- Asegúrate que el archivo en GitHub Pages se llame EXACTAMENTE oxxo.glb -->
+        <!-- Debe existir en GitHub Pages como /oxxo-vr/oxxo.glb -->
         <a-asset-item id="oxxo" src="./oxxo.glb"></a-asset-item>
       </a-assets>
 
-      <!-- Modelo (oculto hasta que cargue) -->
-      <a-entity
-        id="model"
-        gltf-model="#oxxo"
-        position="0 0 0"
-        rotation="0 0 0"
-        scale="1 1 1"
-        visible="false">
-      </a-entity>
+      <!-- Tu modelo -->
+      <a-entity id="model" gltf-model="#oxxo" visible="false"></a-entity>
 
-      <!-- Piso para teleport -->
-      <a-plane
-        class="teleport"
+      <!-- Piso grande para teleport -->
+      <a-plane class="teleport"
         position="0 0 0"
         rotation="-90 0 0"
         width="200"
@@ -49,21 +51,19 @@
       </a-plane>
 
       <!-- Luces -->
-      <a-entity light="type: ambient; intensity: 0.6"></a-entity>
-      <a-entity light="type: directional; intensity: 0.7" position="2 6 3"></a-entity>
+      <a-entity light="type: ambient; intensity: 0.7"></a-entity>
+      <a-entity light="type: directional; intensity: 0.8" position="2 6 3"></a-entity>
 
-      <!-- Rig (usuario) -->
+      <!-- Rig -->
       <a-entity id="rig" position="0 1.7 3">
         <a-camera id="cam" wasd-controls-enabled="false" look-controls></a-camera>
 
-        <a-entity
-          laser-controls="hand: left"
+        <a-entity laser-controls="hand: left"
           raycaster="objects: .teleport"
           teleport-controls="cameraRig: #rig; teleportOrigin: [laser-controls]; collisionEntities: .teleport">
         </a-entity>
 
-        <a-entity
-          laser-controls="hand: right"
+        <a-entity laser-controls="hand: right"
           raycaster="objects: .teleport"
           teleport-controls="cameraRig: #rig; teleportOrigin: [laser-controls]; collisionEntities: .teleport">
         </a-entity>
@@ -81,26 +81,26 @@
         hudEl.textContent = 'ERROR: ' + (e.message || e.error || e);
       });
 
-      function frameModelOnce() {
+      function centerAndFrameModel() {
         const obj = modelEl.getObject3D('mesh');
         if (!obj) return false;
 
-        // Calcula bounding box
+        // Bounding box
         const box = new THREE.Box3().setFromObject(obj);
         const size = new THREE.Vector3();
         const center = new THREE.Vector3();
         box.getSize(size);
         box.getCenter(center);
 
-        // Centra el modelo en el origen
+        // Centrar en origen
         obj.position.sub(center);
 
-        // Ajusta al piso (y = 0)
+        // Ajustar al piso (y=0)
         const box2 = new THREE.Box3().setFromObject(obj);
         const minY = box2.min.y;
         obj.position.y -= minY;
 
-        // Si es enorme, escálalo para que su dimensión máxima sea ~30
+        // Escalar si es enorme
         const maxDim = Math.max(size.x, size.y, size.z);
         let targetMax = maxDim;
         if (maxDim > 40) {
@@ -109,29 +109,29 @@
           targetMax = 30;
         }
 
-        // Coloca al usuario a una distancia razonable
+        // Poner usuario a distancia razonable
         const dist = Math.max(3, targetMax * 1.2);
         rigEl.setAttribute('position', { x: 0, y: 1.7, z: dist });
 
-        // Haz que la cámara mire hacia el centro del modelo
+        // Mirar al centro
         if (camEl && camEl.object3D) {
           camEl.object3D.lookAt(new THREE.Vector3(0, 1.6, 0));
         }
 
-        hudEl.textContent = `Modelo visible ✅ (tamaño aprox: ${maxDim.toFixed(2)})`;
+        hudEl.textContent = `Modelo listo ✅ (tamaño aprox: ${maxDim.toFixed(2)})`;
         return true;
       }
 
       modelEl.addEventListener('model-loaded', () => {
         modelEl.setAttribute('visible', true);
-        hudEl.textContent = 'Modelo cargado ✅ (encuadrando...)';
+        hudEl.textContent = 'GLB cargado ✅ (encuadrando...)';
 
-        // Reintenta un poco por si el mesh tarda en estar disponible
+        // Reintentar por si mesh tarda
         let tries = 0;
-        const timer = setInterval(() => {
+        const t = setInterval(() => {
           tries++;
-          if (frameModelOnce() || tries > 30) clearInterval(timer);
-          if (tries > 30) hudEl.textContent = 'Modelo cargado ✅ pero no pude encuadrar (mesh no listo).';
+          if (centerAndFrameModel() || tries > 30) clearInterval(t);
+          if (tries > 30) hudEl.textContent = 'GLB cargado ✅ pero no pude encuadrar.';
         }, 100);
       });
 
