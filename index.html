@@ -4,15 +4,21 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>OXXO VR</title>
+
   <style>
     html, body { margin: 0; height: 100%; overflow: hidden; background: #111; }
     a-scene { width: 100vw; height: 100vh; }
-    #hud { position: fixed; top: 10px; left: 10px; z-index: 9999;
-           background: #000a; color: #fff; padding: 10px; font-family: monospace;
-           border-radius: 8px; pointer-events: none; }
+    #hud {
+      position: fixed; top: 10px; left: 10px; z-index: 9999;
+      background: #000a; color: #fff; padding: 10px;
+      font-family: monospace; border-radius: 8px;
+      pointer-events: none;
+    }
   </style>
 
+  <!-- A-Frame -->
   <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+  <!-- Teleport controls -->
   <script src="https://cdn.jsdelivr.net/gh/fernandojsg/aframe-teleport-controls@master/dist/aframe-teleport-controls.min.js"></script>
 </head>
 
@@ -20,12 +26,16 @@
   <div id="hud">Cargando GLB…</div>
 
   <a-scene background="color: #111" vr-mode-ui="enabled: true" renderer="colorManagement: true">
-    <!-- Referencias visuales (SIEMPRE deben verse) -->
+    <!-- Referencias visibles (siempre deben verse) -->
     <a-box position="0 1 -3" color="#ff0000"></a-box>
     <a-plane position="0 0 -3" rotation="-90 0 0" width="10" height="10" color="#555"></a-plane>
 
     <a-assets>
-      <a-asset-item id="oxxo" src="./oxxo.glb"></a-asset-item>
+      <!-- ✅ Usa RAW de GitHub (evita fallos de GitHub Pages con binarios grandes) -->
+      <a-asset-item
+        id="oxxo"
+        src="https://raw.githubusercontent.com/evelinhernandez-create/oxxo-vr/main/oxxo.glb">
+      </a-asset-item>
     </a-assets>
 
     <!-- Modelo -->
@@ -66,26 +76,30 @@
       const rigEl = document.getElementById('rig');
       const camEl = document.getElementById('cam');
 
+      window.addEventListener('error', (e) => {
+        hudEl.textContent = 'ERROR: ' + (e.message || e.error || e);
+      });
+
       function placeModel() {
         const obj = modelEl.getObject3D('mesh');
         if (!obj) return false;
 
-        // Bounding box
         const box = new THREE.Box3().setFromObject(obj);
         const size = new THREE.Vector3();
         const center = new THREE.Vector3();
         box.getSize(size);
         box.getCenter(center);
 
-        // Centrar
+        // centrar
         obj.position.sub(center);
 
-        // Poner en el piso
+        // al piso
         const box2 = new THREE.Box3().setFromObject(obj);
         obj.position.y -= box2.min.y;
 
-        // Escalar si es enorme
         const maxDim = Math.max(size.x, size.y, size.z);
+
+        // escalar si es enorme
         let targetMax = maxDim;
         if (maxDim > 40) {
           const s = 30 / maxDim;
@@ -93,11 +107,11 @@
           targetMax = 30;
         }
 
-        // Cámara a distancia segura
+        // distancia
         const dist = Math.max(6, targetMax * 1.2);
         rigEl.setAttribute('position', { x: 0, y: 1.7, z: dist });
 
-        // Mirar al centro
+        // mirar al centro
         if (camEl && camEl.object3D) camEl.object3D.lookAt(new THREE.Vector3(0, 1.6, 0));
 
         hudEl.textContent = `GLB listo ✅ (tamaño aprox: ${maxDim.toFixed(2)})`;
@@ -118,7 +132,8 @@
 
       modelEl.addEventListener('model-error', (e) => {
         hudEl.textContent = 'ERROR cargando GLB (model-error).';
-        console.log('model-error', e);
+        console.log('model-error event:', e);
+        console.log('detail:', e.detail);
       });
     </script>
   </a-scene>
