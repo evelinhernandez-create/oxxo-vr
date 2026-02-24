@@ -5,30 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>OXXO VR</title>
 
-    <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
-
-    <!-- Teleport controls (community component) -->
     <script src="https://cdn.jsdelivr.net/gh/fernandojsg/aframe-teleport-controls@master/dist/aframe-teleport-controls.min.js"></script>
   </head>
 
   <body>
+    <div id="hud" style="position:fixed;top:10px;left:10px;z-index:9999;background:#000a;color:#fff;padding:10px;font-family:monospace;border-radius:8px;">
+      Cargando modelo…
+    </div>
+
     <a-scene background="color: #111" renderer="colorManagement: true" vr-mode-ui="enabled: true" stats>
       <a-assets>
-        <!-- Pon tu GLB en la misma carpeta que este HTML -->
         <a-asset-item id="oxxo" src="./oxxo.glb"></a-asset-item>
       </a-assets>
 
-      <!-- Tu modelo -->
-      <!-- Ajusta position/rotation/scale si lo ves flotando o girado -->
       <a-entity id="model"
         gltf-model="#oxxo"
         position="0 0 0"
         rotation="0 0 0"
-        scale="1 1 1">
+        scale="1 1 1"
+        visible="false">
       </a-entity>
 
-      <!-- Piso simple para teleport (en caso de que tu modelo no tenga un piso “teleporteable”) -->
       <a-plane class="teleport"
         position="0 0 0"
         rotation="-90 0 0"
@@ -38,15 +36,12 @@
         opacity="0.0">
       </a-plane>
 
-      <!-- Luz básica -->
       <a-entity light="type: ambient; intensity: 0.6"></a-entity>
       <a-entity light="type: directional; intensity: 0.7" position="2 6 3"></a-entity>
 
-      <!-- Rig (usuario) -->
       <a-entity id="rig" position="0 1.7 3">
         <a-camera wasd-controls-enabled="false"></a-camera>
 
-        <!-- Controladores Quest -->
         <a-entity laser-controls="hand: left"
           raycaster="objects: .teleport"
           teleport-controls="cameraRig: #rig; teleportOrigin: [laser-controls]; collisionEntities: .teleport">
@@ -58,5 +53,28 @@
         </a-entity>
       </a-entity>
     </a-scene>
+
+    <script>
+      const hudEl = document.getElementById('hud');
+      const modelEl = document.getElementById('model');
+      const rigEl = document.getElementById('rig');
+
+      // Errores globales
+      window.addEventListener('error', (e) => {
+        hudEl.textContent = 'ERROR: ' + (e.message || e.error || e);
+      });
+
+      // Estado de carga del modelo
+      modelEl.addEventListener('model-loaded', () => {
+        modelEl.setAttribute('visible', true);
+        hudEl.textContent = 'Modelo cargado ✅';
+        rigEl.setAttribute('position', { x: 0, y: 1.7, z: 3 });
+      });
+
+      modelEl.addEventListener('model-error', (e) => {
+        hudEl.textContent = 'ERROR cargando GLB (model-error).';
+        console.log('model-error', e);
+      });
+    </script>
   </body>
 </html>
