@@ -55,26 +55,55 @@
     </a-scene>
 
     <script>
-      const hudEl = document.getElementById('hud');
-      const modelEl = document.getElementById('model');
-      const rigEl = document.getElementById('rig');
+  const hudEl = document.getElementById('hud');
+  const modelEl = document.getElementById('model');
+  const rigEl = document.getElementById('rig');
 
-      // Errores globales
-      window.addEventListener('error', (e) => {
-        hudEl.textContent = 'ERROR: ' + (e.message || e.error || e);
-      });
+  window.addEventListener('error', (e) => {
+    hudEl.textContent = 'ERROR: ' + (e.message || e.error || e);
+  });
 
-      // Estado de carga del modelo
-      modelEl.addEventListener('model-loaded', () => {
-        modelEl.setAttribute('visible', true);
-        hudEl.textContent = 'Modelo cargado ✅';
-        rigEl.setAttribute('position', { x: 0, y: 1.7, z: 3 });
-      });
+  function frameModel() {
+    const obj = modelEl.getObject3D('mesh');
+    if (!obj) return false;
 
-      modelEl.addEventListener('model-error', (e) => {
-        hudEl.textContent = 'ERROR cargando GLB (model-error).';
-        console.log('model-error', e);
-      });
-    </script>
+    const box = new THREE.Box3().setFromObject(obj);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+
+    obj.position.sub(center);
+
+    const box2 = new THREE.Box3().setFromObject(obj);
+    const minY = box2.min.y;
+    obj.position.y -= minY;
+
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const dist = Math.max(3, maxDim * 1.2);
+
+    rigEl.setAttribute('position', { x: 0, y: 1.7, z: dist });
+    hudEl.textContent = `Modelo visible ✅ (tamaño aprox: ${maxDim.toFixed(2)})`;
+    return true;
+  }
+
+  modelEl.addEventListener('model-loaded', () => {
+    modelEl.setAttribute('visible', true);
+    hudEl.textContent = 'Modelo cargado ✅ (encuadrando...)';
+
+    // intenta varias veces por si el mesh tarda en estar disponible
+    let tries = 0;
+    const t = setInterval(() => {
+      tries++;
+      if (frameModel() || tries > 20) clearInterval(t);
+      if (tries > 20) hudEl.textContent = 'Modelo cargado ✅ pero no pude encuadrar (mesh no listo).';
+    }, 100);
+  });
+
+  modelEl.addEventListener('model-error', (e) => {
+    hudEl.textContent = 'ERROR cargando GLB (model-error).';
+    console.log('model-error', e);
+  });
+</script>
   </body>
 </html>
