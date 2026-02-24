@@ -5,21 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>OXXO VR</title>
 
+    <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.7.0/aframe.min.js"></script>
+
+    <!-- Teleport controls -->
     <script src="https://cdn.jsdelivr.net/gh/fernandojsg/aframe-teleport-controls@master/dist/aframe-teleport-controls.min.js"></script>
   </head>
 
   <body>
+    <!-- HUD -->
     <div id="hud" style="position:fixed;top:10px;left:10px;z-index:9999;background:#000a;color:#fff;padding:10px;font-family:monospace;border-radius:8px;">
       Cargando modelo…
     </div>
 
-    <a-scene background="color: #111" renderer="colorManagement: true" vr-mode-ui="enabled: true" stats>
+    <a-scene background="color: #111" renderer="colorManagement: true" vr-mode-ui="enabled: true">
+      <!-- Guía visual mínima: una caja en el origen -->
+      <a-box position="0 0.5 0" wireframe="true" width="1" height="1" depth="1"></a-box>
+
       <a-assets>
+        <!-- Asegúrate que el archivo en GitHub Pages se llame EXACTAMENTE oxxo.glb -->
         <a-asset-item id="oxxo" src="./oxxo.glb"></a-asset-item>
       </a-assets>
 
-      <a-entity id="model"
+      <!-- Modelo (oculto hasta que cargue) -->
+      <a-entity
+        id="model"
         gltf-model="#oxxo"
         position="0 0 0"
         rotation="0 0 0"
@@ -27,27 +37,33 @@
         visible="false">
       </a-entity>
 
-      <a-plane class="teleport"
+      <!-- Piso para teleport -->
+      <a-plane
+        class="teleport"
         position="0 0 0"
         rotation="-90 0 0"
-        width="50"
-        height="50"
+        width="200"
+        height="200"
         color="#222"
         opacity="0.0">
       </a-plane>
 
+      <!-- Luces -->
       <a-entity light="type: ambient; intensity: 0.6"></a-entity>
       <a-entity light="type: directional; intensity: 0.7" position="2 6 3"></a-entity>
 
+      <!-- Rig (usuario) -->
       <a-entity id="rig" position="0 1.7 3">
-        <a-camera wasd-controls-enabled="false"></a-camera>
+        <a-camera id="cam" wasd-controls-enabled="false" look-controls></a-camera>
 
-        <a-entity laser-controls="hand: left"
+        <a-entity
+          laser-controls="hand: left"
           raycaster="objects: .teleport"
           teleport-controls="cameraRig: #rig; teleportOrigin: [laser-controls]; collisionEntities: .teleport">
         </a-entity>
 
-        <a-entity laser-controls="hand: right"
+        <a-entity
+          laser-controls="hand: right"
           raycaster="objects: .teleport"
           teleport-controls="cameraRig: #rig; teleportOrigin: [laser-controls]; collisionEntities: .teleport">
         </a-entity>
@@ -55,55 +71,74 @@
     </a-scene>
 
     <script>
-  const hudEl = document.getElementById('hud');
-  const modelEl = document.getElementById('model');
-  const rigEl = document.getElementById('rig');
+      const hudEl = document.getElementById('hud');
+      const modelEl = document.getElementById('model');
+      const rigEl = document.getElementById('rig');
+      const camEl = document.getElementById('cam');
 
-  window.addEventListener('error', (e) => {
-    hudEl.textContent = 'ERROR: ' + (e.message || e.error || e);
-  });
+      // Errores globales
+      window.addEventListener('error', (e) => {
+        hudEl.textContent = 'ERROR: ' + (e.message || e.error || e);
+      });
 
-  function frameModel() {
-    const obj = modelEl.getObject3D('mesh');
-    if (!obj) return false;
+      function frameModelOnce() {
+        const obj = modelEl.getObject3D('mesh');
+        if (!obj) return false;
 
-    const box = new THREE.Box3().setFromObject(obj);
-    const size = new THREE.Vector3();
-    const center = new THREE.Vector3();
-    box.getSize(size);
-    box.getCenter(center);
+        // Calcula bounding box
+        const box = new THREE.Box3().setFromObject(obj);
+        const size = new THREE.Vector3();
+        const center = new THREE.Vector3();
+        box.getSize(size);
+        box.getCenter(center);
 
-    obj.position.sub(center);
+        // Centra el modelo en el origen
+        obj.position.sub(center);
 
-    const box2 = new THREE.Box3().setFromObject(obj);
-    const minY = box2.min.y;
-    obj.position.y -= minY;
+        // Ajusta al piso (y = 0)
+        const box2 = new THREE.Box3().setFromObject(obj);
+        const minY = box2.min.y;
+        obj.position.y -= minY;
 
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const dist = Math.max(3, maxDim * 1.2);
+        // Si es enorme, escálalo para que su dimensión máxima sea ~30
+        const maxDim = Math.max(size.x, size.y, size.z);
+        let targetMax = maxDim;
+        if (maxDim > 40) {
+          const s = 30 / maxDim;
+          modelEl.object3D.scale.set(s, s, s);
+          targetMax = 30;
+        }
 
-    rigEl.setAttribute('position', { x: 0, y: 1.7, z: dist });
-    hudEl.textContent = `Modelo visible ✅ (tamaño aprox: ${maxDim.toFixed(2)})`;
-    return true;
-  }
+        // Coloca al usuario a una distancia razonable
+        const dist = Math.max(3, targetMax * 1.2);
+        rigEl.setAttribute('position', { x: 0, y: 1.7, z: dist });
 
-  modelEl.addEventListener('model-loaded', () => {
-    modelEl.setAttribute('visible', true);
-    hudEl.textContent = 'Modelo cargado ✅ (encuadrando...)';
+        // Haz que la cámara mire hacia el centro del modelo
+        if (camEl && camEl.object3D) {
+          camEl.object3D.lookAt(new THREE.Vector3(0, 1.6, 0));
+        }
 
-    // intenta varias veces por si el mesh tarda en estar disponible
-    let tries = 0;
-    const t = setInterval(() => {
-      tries++;
-      if (frameModel() || tries > 20) clearInterval(t);
-      if (tries > 20) hudEl.textContent = 'Modelo cargado ✅ pero no pude encuadrar (mesh no listo).';
-    }, 100);
-  });
+        hudEl.textContent = `Modelo visible ✅ (tamaño aprox: ${maxDim.toFixed(2)})`;
+        return true;
+      }
 
-  modelEl.addEventListener('model-error', (e) => {
-    hudEl.textContent = 'ERROR cargando GLB (model-error).';
-    console.log('model-error', e);
-  });
-</script>
+      modelEl.addEventListener('model-loaded', () => {
+        modelEl.setAttribute('visible', true);
+        hudEl.textContent = 'Modelo cargado ✅ (encuadrando...)';
+
+        // Reintenta un poco por si el mesh tarda en estar disponible
+        let tries = 0;
+        const timer = setInterval(() => {
+          tries++;
+          if (frameModelOnce() || tries > 30) clearInterval(timer);
+          if (tries > 30) hudEl.textContent = 'Modelo cargado ✅ pero no pude encuadrar (mesh no listo).';
+        }, 100);
+      });
+
+      modelEl.addEventListener('model-error', (e) => {
+        hudEl.textContent = 'ERROR cargando GLB (model-error).';
+        console.log('model-error', e);
+      });
+    </script>
   </body>
 </html>
